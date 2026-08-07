@@ -11,6 +11,8 @@ rust-version = "1.87.0"
 readme = "README.md"
 
 [dependencies]
+strata-json-rules = { path = "../json-rules-llm1" }
+strata-lexer = { path = "../lexer-llm1" }
 
 [lints.rust]
 future_incompatible = { level = "warn", priority = -1 }
