@@ -25,4 +25,7 @@ pub use parse::{
     ArrayNode, DEFAULT_MAX_DEPTH, Document, Element, JsonError, JsonErrorKind, JsonParser,
     JsonParserBuilder, Member, ObjectNode, SyntaxToken, Trivia, TriviaKind, Value,
 };
-pub use strata_json_rules::JsonToken;
+pub use strata_json_rules::{
+    BomRule, JsonToken, LiteralRule, NumberRule, PunctRule, SharedRuleSet, StrictRuleSet,
+    StringRule, WhitespaceRule, strict_rule_set, strict_scanner,
+};
