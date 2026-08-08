@@ -8,6 +8,42 @@ superset-language parsers.
 
 This crate is in initial development. The public API is not settled yet.
 
+## Usage
+
+```rust
+use strata_json_parser::{JsonError, JsonParser, Value};
+
+fn main() -> Result<(), JsonError> {
+    let document = JsonParser::new().parse_str(r#"{"greeting": "hello",  "count": 3}"#)?;
+
+    let Value::Object(object) = document.root() else {
+        panic!("expected an object root");
+    };
+    let [greeting, count] = object.members() else {
+        panic!("expected two members");
+    };
+
+    // Nothing is decoded: the CST keeps raw spans into the retained source.
+    assert_eq!(
+        document.token_bytes(greeting.name()),
+        Some(&b"\"greeting\""[..])
+    );
+
+    // Trivia is retained, attached to the token it precedes.
+    let [gap] = count.name().leading() else {
+        panic!("expected the double space before \"count\"");
+    };
+    assert_eq!(document.trivia_bytes(gap), Some(&b"  "[..]));
+
+    Ok(())
+}
+```
+
+Superset parsers do not wrap `JsonParser`; they implement the `grammar::Syntax` trait and
+instantiate the generic CST with their own token and trivia kinds. Resolver layers decode
+string and number lexemes through the `decode` module. See
+[docs/strata-json-parser.md](docs/strata-json-parser.md) for the design reference.
+
 ## Minimum Supported Rust Version
 
 The MSRV is **1.87.0**.

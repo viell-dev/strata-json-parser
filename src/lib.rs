@@ -29,3 +29,8 @@ pub use strata_json_rules::{
     BomRule, JsonToken, LiteralRule, NumberRule, PunctRule, SharedRuleSet, StrictRuleSet,
     StringRule, WhitespaceRule, strict_rule_set, strict_scanner,
 };
+
+/// Compile-checks the README examples alongside the doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme {}
