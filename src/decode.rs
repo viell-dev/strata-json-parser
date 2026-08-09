@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn unicode_escapes_decode() -> Result<(), Error> {
         assert_eq!(unescape(r#""Aé€""#)?, "A\u{E9}\u{20AC}");
-        assert_eq!(unescape(r#"" ""#)?, "\u{0}");
+        assert_eq!(unescape(r#""\u0000""#)?, "\u{0}");
 
         Ok(())
     }
