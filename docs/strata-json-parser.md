@@ -102,10 +102,12 @@ depend on each other (the JSONC resolver reuses JSON decoding through its parser
   UTF-16 surrogate pairs via the streaming `Utf16Decoder` (reused by JSON5's decode for its
   shared escapes). Lone surrogates resolve per `LoneSurrogates` (`Error`, the strict default, or
   `Replace` with U+FFFD). Errors carry the byte offset of the offending escape's backslash.
-- `parse_number(raw)` — integer-preserving classification: `Number::U64` for non-negative
-  integers that fit, `I64` for negative, `F64` otherwise (fractions, exponents, `-0` keeping its
-  sign, and 64-bit overflow with documented rounding; magnitudes beyond `f64` become infinite).
-  Raw text stays reachable through the CST for arbitrary-precision consumers.
+- `parse_number(raw)` — returns a `DecodedNumber`: the converted value (`Number::U64` for
+  non-negative integers that fit, `I64` for negative, `F64` otherwise — fractions, exponents,
+  `-0` keeping its sign, and 64-bit overflow with documented rounding; magnitudes beyond `f64`
+  become infinite) plus the written form as a `NumberFormat` (`Integer`, `Decimal`,
+  `Exponential`) — author-intent fidelity the resolvers surface on their models. Raw text stays
+  reachable through the CST for arbitrary-precision consumers.
 - The functions are total over arbitrary input: parser-produced tokens cannot be malformed, but
   the functions are public and re-check shape (`ErrorKind::MalformedToken`) instead of trusting
   callers.

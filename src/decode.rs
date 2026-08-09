@@ -450,14 +450,38 @@ impl Number {
     }
 }
 
-/// Converts a raw RFC 8259 number lexeme into an owned [`Number`].
+/// The written form of a number lexeme — author-intent fidelity for the resolved model.
+///
+/// The classification says how the author spelled the number; the converted value lives in
+/// [`Number`] and the raw bytes stay reachable through the CST span, so nothing needs to be
+/// re-stringified.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NumberFormat {
+    /// Digits only, with an optional sign: `42`, `-17`.
+    Integer,
+    /// A fraction part and no exponent: `3.25`.
+    Decimal,
+    /// An exponent part: `1.23e+5`, `1E9`.
+    Exponential,
+}
+
+/// A decoded number lexeme: the converted value and the written form it came from.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DecodedNumber {
+    /// The converted value, integer-preserving where it fits.
+    pub value: Number,
+    /// The written form of the lexeme.
+    pub format: NumberFormat,
+}
+
+/// Converts a raw RFC 8259 number lexeme into a [`DecodedNumber`].
 ///
 /// Integers keep their integer identity where they fit (`U64` for non-negative, `I64` for
 /// negative); everything else converts to `f64` — including `-0`, which stays `-0.0` to preserve
 /// its sign, and integers beyond 64 bits, which may round (magnitudes beyond `f64` range become
-/// infinite). The raw text stays available through the CST for consumers needing arbitrary
-/// precision.
-pub fn parse_number(raw: &[u8]) -> Result<Number, Error> {
+/// infinite). The written form is classified alongside; the raw text stays available through the
+/// CST for consumers needing arbitrary precision.
+pub fn parse_number(raw: &[u8]) -> Result<DecodedNumber, Error> {
     let text = core::str::from_utf8(raw).map_err(|error| Error {
         offset: error.valid_up_to(),
         kind: ErrorKind::MalformedToken,
@@ -466,8 +490,21 @@ pub fn parse_number(raw: &[u8]) -> Result<Number, Error> {
         offset: 0,
         kind: ErrorKind::MalformedToken,
     };
+    let format = if text.bytes().any(|byte| matches!(byte, b'e' | b'E')) {
+        NumberFormat::Exponential
+    } else if text.bytes().any(|byte| byte == b'.') {
+        NumberFormat::Decimal
+    } else {
+        NumberFormat::Integer
+    };
+    let value = number_value(text, format, malformed)?;
 
-    if text.bytes().any(|byte| matches!(byte, b'.' | b'e' | b'E')) {
+    Ok(DecodedNumber { value, format })
+}
+
+/// Converts a UTF-8 number lexeme into its owned value.
+fn number_value(text: &str, format: NumberFormat, malformed: Error) -> Result<Number, Error> {
+    if format != NumberFormat::Integer {
         return text.parse::<f64>().map(Number::F64).map_err(|_| malformed);
     }
 
@@ -612,15 +649,15 @@ mod tests {
 
     #[test]
     fn numbers_preserve_integer_identity() -> Result<(), Error> {
-        assert_eq!(parse_number(b"0")?, Number::U64(0));
-        assert_eq!(parse_number(b"42")?, Number::U64(42));
+        assert_eq!(parse_number(b"0")?.value, Number::U64(0));
+        assert_eq!(parse_number(b"42")?.value, Number::U64(42));
         assert_eq!(
-            parse_number(b"18446744073709551615")?,
+            parse_number(b"18446744073709551615")?.value,
             Number::U64(u64::MAX)
         );
-        assert_eq!(parse_number(b"-17")?, Number::I64(-17));
+        assert_eq!(parse_number(b"-17")?.value, Number::I64(-17));
         assert_eq!(
-            parse_number(b"-9223372036854775808")?,
+            parse_number(b"-9223372036854775808")?.value,
             Number::I64(i64::MIN)
         );
 
@@ -629,7 +666,7 @@ mod tests {
 
     #[test]
     fn negative_zero_preserves_its_sign() -> Result<(), Error> {
-        let Number::F64(value) = parse_number(b"-0")? else {
+        let Number::F64(value) = parse_number(b"-0")?.value else {
             panic!("expected -0 to convert as a float");
         };
         assert_eq!(value.to_bits(), (-0.0f64).to_bits());
@@ -639,10 +676,10 @@ mod tests {
 
     #[test]
     fn fractions_and_exponents_convert_to_f64() -> Result<(), Error> {
-        assert_eq!(parse_number(b"3.25")?, Number::F64(3.25));
-        assert_eq!(parse_number(b"-0.5")?, Number::F64(-0.5));
-        assert_eq!(parse_number(b"1e10")?, Number::F64(1e10));
-        assert_eq!(parse_number(b"2.5E-3")?, Number::F64(2.5e-3));
+        assert_eq!(parse_number(b"3.25")?.value, Number::F64(3.25));
+        assert_eq!(parse_number(b"-0.5")?.value, Number::F64(-0.5));
+        assert_eq!(parse_number(b"1e10")?.value, Number::F64(1e10));
+        assert_eq!(parse_number(b"2.5E-3")?.value, Number::F64(2.5e-3));
 
         Ok(())
     }
@@ -650,13 +687,25 @@ mod tests {
     #[test]
     fn oversized_integers_fall_back_to_f64() -> Result<(), Error> {
         assert_eq!(
-            parse_number(b"18446744073709551616")?,
+            parse_number(b"18446744073709551616")?.value,
             Number::F64(18_446_744_073_709_551_616.0)
         );
         assert_eq!(
-            parse_number(b"-9223372036854775809")?,
+            parse_number(b"-9223372036854775809")?.value,
             Number::F64(-9_223_372_036_854_775_809.0)
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn number_formats_classify_the_written_form() -> Result<(), Error> {
+        assert_eq!(parse_number(b"42")?.format, NumberFormat::Integer);
+        assert_eq!(parse_number(b"-17")?.format, NumberFormat::Integer);
+        assert_eq!(parse_number(b"3.25")?.format, NumberFormat::Decimal);
+        assert_eq!(parse_number(b"-0.5")?.format, NumberFormat::Decimal);
+        assert_eq!(parse_number(b"1e10")?.format, NumberFormat::Exponential);
+        assert_eq!(parse_number(b"2.5E-3")?.format, NumberFormat::Exponential);
 
         Ok(())
     }
