@@ -1,7 +1,7 @@
 # Contributing
 
 Thank you for your interest in contributing to `strata-json-parser`. Issues and pull requests are
-welcome on the [upstream repository](https://codeberg.org/Devious-Concepts/strata-json-parser).
+welcome on the [upstream repository](https://github.com/viell-dev/strata-json-parser).
 
 ## Licensing of contributions
 
@@ -46,5 +46,5 @@ description:
 ## Provenance
 
 This document is maintained as part of the
-[strata-license](https://codeberg.org/Devious-Concepts/strata-license) template. The copy in
+[strata-template](https://github.com/viell-dev/strata-template) template. The copy in
 this repository is the version that applies to this project.
